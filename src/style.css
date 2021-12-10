@@ -1,0 +1,149 @@
+html, body {
+  margin: 0; padding: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+header > h2 {
+  margin: 0;
+}
+
+#page-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto 0 auto;
+}
+
+#notification {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3em;
+  position: absolute;
+  z-index: 12;
+  display: flex;
+}
+#notification.hidden {
+  display: none;
+}
+
+#message.hidden {
+  visibility: hidden;
+}
+
+#page-header {
+  padding-top: 0.5rem;
+  flex: 0 1 13vh;
+}
+
+#panels {
+  display: contents;
+}
+
+.scene-panel {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.scene-panel > section.body {
+  padding: 0.5rem 1rem 1rem 0.5rem;
+  flex: 1 1 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.scene-panel > footer {
+  flex: 0 1 0;
+}
+
+.scene-panel.hidden {
+  display: none;
+}
+
+body[data-scene="waiting"] .scene-panel.previous.hidden {
+  display: block;
+}
+
+section.body > .body-upper {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+}
+section.body > .body-lower {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+}
+
+.offscreen {
+  transform: translateX(-100vw);
+}
+
+body {
+  background-color: #eee;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+}
+
+
+h1 {
+  font-family: cursive;
+}
+
+
+#table {
+  display: block;
+  position: relative;
+  width: 800px;
+  height: 600px;
+  background-color: #090;
+  box-shadow: 2px 1px 12px inset black;
+
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Old versions of Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome, Edge, Opera and Firefox */
+}
+#table:not([enabled]) {
+  opacity: 0.3;
+}
+
+.card {
+  position: absolute;
+  display: block;
+  z-index: 0;
+  background-color: white;
+  box-shadow: 2px 5px 5px black;
+  border-radius: 8px;
+  width: 80px;
+  height: 140px;
+  transform: rotate(0deg);
+  padding: 8px;
+}
+.card.removing {
+  opacity: 0;
+  background-color: grey;
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+.card.♥,
+.card.♦ {
+  color: red;
+}
+
+.card.♣,
+.card.♠ {
+  color: black;
+}
+
+

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>52 Card Pickup</title>
+
+  <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg"/>
+  <meta name="msapplication-TileColor" content="#ff0000">
+
+  <link rel="stylesheet" href="./style.css">
+
+  <script async src="./assets/elements.js"></script>
+  <script async src="./assets/client.js"></script>
+  <script async src="./assets/scenes.js"></script>
+  <script src="./assets/main.js" defer></script>
+</head>
+
+<body>
+<div id="page-container">
+  <div id="notification" class="hidden"><section class="message-body"></section></div>
+  <header id="page-header">
+    <h1>52 Card Pickup</h1>
+  </header>
+  <div id="panels">
+
+    <div id="initializing" class="scene-panel hidden">
+      <section class="body">
+        <button onclick="game.switchScene('lobby')">Ok, to the lobby</button>
+      </section>
+    </div>
+
+    <div id="lobby" class="scene-panel hidden">
+      <section class="body">
+        <button onclick="game.switchScene('cardplay')">Begin!</button>
+      </section>
+    </div>
+
+    <div id="cardplay" class="scene-panel hidden">
+      <section class="body">
+        <game-table id="table"></game-table>
+ 
+        <button onclick="game.switchScene('gameover')">Complete, check results</button>
+     </section>
+    </div>
+
+    <div id="notavailable" class="scene-panel hidden">
+      <section class="body">
+        <h2>Oh noes</h2>
+        <button onclick="game.switchScene('startup')">Try again</button>
+      </section>
+    </div>
+
+    <div id="gameover" class="scene-panel hidden">
+      <section class="body">
+        <button onclick="game.switchScene('startup')">Play again</button>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>
