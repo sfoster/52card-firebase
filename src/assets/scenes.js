@@ -52,7 +52,6 @@ class Scene {
 class InitializeScene extends Scene {
   enter(params = {}) {
     super.enter(params);
-    console.log("Enter InitializeScene");
     this.client.status().then(result => {
       if (result.ok) {
         this.statusOk(result);
@@ -60,6 +59,7 @@ class InitializeScene extends Scene {
         this.statusNotOk(result);
       }
     }).catch(ex =>{
+      console.warn("Exception entering scene: ", ex);
       this.statusNotOk(ex);
     })
   }
@@ -79,6 +79,21 @@ class InitializeScene extends Scene {
 class LobbyScene extends Scene {
   enter(params = {}) {
     super.enter(params);
+    this.userList = this.elem.querySelector("#playersjoined");
+    this.addUser({ id: "playerone", name: "", placeholder: "Your name goes here" });
+    this.client.fetchUserData().then(data => {
+      for (let user of data.added) {
+        this.addUser(Object.assign(user, { remote: true }));
+      }
+    })
+  }
+  addUser({ id, name, placeholder="", remote=false }) {
+    let item = new EditableItem();
+    item.remote = remote;
+    item.value = name;
+    item.placeholder = placeholder;
+    this.userList.appendChild(item);
+    console.log("Adding user: ", item, name, remote);
   }
 }
 
@@ -87,8 +102,21 @@ class CardPlayScene extends Scene {
     super.enter(params);
     this.elem.addEventListener("game-action", this);
     this.cardTableElem = this.elem.querySelector("#table");
-    let cardItems = await this.client.fetchData();
-    this.cardTableElem.begin({ added: cardItems });
+    const cardItemsPromise = this.client.fetchCardsData();
+    const usersPromise = this.client.fetchUserData();
+    this.cardTableElem.begin({ added: await cardItemsPromise });
+
+    this.userList = this.elem.querySelector("#userStatus");
+    const { status } = await usersPromise;
+    console.log("CardPlayScene#enter, users:", status);
+
+    let frag = document.createDocumentFragment();
+    for (let user of await status) {
+      let item = document.createElement("li");
+      item.textContent = `${user.name} (${user.score})`;
+      frag.appendChild(item);
+    }
+    this.userList.appendChild(frag);
   }
   handleEvent(event) {
     const eventData = event.detail;
@@ -100,8 +128,8 @@ class CardPlayScene extends Scene {
       };
       card.remove(); // optimistically start hiding the card, we'll restore it if necessary
 
-      this.client.updateData(eventData).then(result => {
-        console.log("got updateData result:", result);
+      this.client.updateCardsData(eventData).then(result => {
+        console.log("got updateCardsData result:", result);
         this.cardTableElem.update({ removed: [result.id] });
       }).catch(ex => {
         console.warn("Exception handling game-action:", eventData, ex);
@@ -123,7 +151,6 @@ class NotAvailableScene extends Scene {
     super.enter(params);
     console.log("Enter NotAvailableScene, errorCode:", params.errorCode);
 
-    this.client.toggleHeartbeat(false);
     if (this.game.joined) {
       this.client.leaveQueue();
       this.game.joined = false;

@@ -10,6 +10,7 @@
 
   <link rel="stylesheet" href="./style.css">
 
+  <script async src="./assets/names.js"></script>
   <script async src="./assets/elements.js"></script>
   <script async src="./assets/client.js"></script>
   <script async src="./assets/scenes.js"></script>
@@ -31,17 +32,30 @@
     </div>
 
     <div id="lobby" class="scene-panel hidden">
+      <header>
+        <h2>Waiting for players</h2>
+      </header>
       <section class="body">
-        <button onclick="game.switchScene('cardplay')">Begin!</button>
+        <ul class="userlist" id="playersjoined"></ul>
       </section>
+      <footer>
+        <button class="primary-action" onclick="game.switchScene('cardplay')">Begin!</button>
+      </footer>
     </div>
 
     <div id="cardplay" class="scene-panel hidden">
+      <header>
+        <h2>Click 'em to pick 'em</h2>
+      </header>
       <section class="body">
         <game-table id="table"></game-table>
- 
-        <button onclick="game.switchScene('gameover')">Complete, check results</button>
+       <div id="userSidebar">
+          <ul class="userlist" id="userStatus"></ul>
+       </div>
      </section>
+      <footer>
+        <button class="primary-action" onclick="game.switchScene('gameover')">Complete, check results</button>
+      </footer>
     </div>
 
     <div id="notavailable" class="scene-panel hidden">
@@ -53,8 +67,10 @@
 
     <div id="gameover" class="scene-panel hidden">
       <section class="body">
-        <button onclick="game.switchScene('startup')">Play again</button>
       </section>
+      <footer>
+        <button class="primary-action" onclick="game.switchScene('startup')">Play again</button>
+      </footer>
     </div>
   </div>
 </div>

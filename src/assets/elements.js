@@ -148,3 +148,100 @@ class Card extends HTMLElement {
   }
 }
 customElements.define("game-card", Card);
+
+class EditableItem extends HTMLElement {
+  connectedCallback() {
+    this.classList.add("editable-label");
+    this.textContent = "";
+    let input = this.input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = this.placeholder;
+    input.setAttribute("spellcheck", "false");
+    let okButton = this.okButton = document.createElement("button");
+    okButton.textContent = "OK";
+    this.appendChild(input);
+    this.appendChild(okButton);
+    this.value = this.dataset.value;
+    this.remote = this.dataset.remote == "false" ? false : true;
+    this.input.value = this.value;
+    this.endEditing();
+  }
+  get value() {
+    return this.dataset.value;
+  }
+  set value(val) {
+    this.dataset.value = val;
+    if (this.input) {
+      this.input.value = val;
+    }
+  }
+  get placeholder() {
+    return this.dataset.placeholder;
+  }
+  set placeholder(val) {
+    this.dataset.placeholder = val;
+    if (this.input) {
+      this.input.placeholder = val;
+    }
+  }
+  get remote() {
+    return this.dataset.remote;
+  }
+  set remote(val) {
+    val = !!val;
+    console.log("Setting remote:", val);
+    this.dataset.remote = val;
+    if (this.input) {
+      this.input.readOnly = val;
+    }
+  }
+  remove() {
+    if (this._removalPromise) {
+      console.log(`Card: ${this.id} already scheduled for removal`);
+      return this._removalPromise;
+    }
+    let transitioned = waitForTransition(this);
+    this.classList.add("removing");
+    this._pendingRemoval = true;
+    this._removalPromise = transitioned.finally(() => {
+      if (this._pendingRemoval) {
+        console.log(`EditableLabel: confirming removal of ${this.id}`);
+        this._pendingRemoval = false;
+        super.remove();
+      }
+    });
+    return this._removalPromise;
+  }
+  restore() {
+    this._pendingRemoval = false;
+    this._removalPromise = null;
+    this.classList.remove("removing");
+  }
+  handleEvent(event) {
+    if (event.type =="focus") {
+      this.startEditing();
+      return;
+    }
+    if (
+      (event.type =="keyup" && event.key == "Enter") ||
+      event.type =="blur"
+    ) {
+      this.endEditing();
+      return;
+    }
+  }
+  startEditing() {
+    this.setAttribute("editing", "");
+    this.addEventListener("keyup", this);
+    this.addEventListener("blur", this);
+    console.log("startEditing, value: ", this.value, this.input.value);
+  }
+  endEditing() {
+    this.removeAttribute("editing");
+    if (!this.hasAttribute("remote")) {
+      this.addEventListener("focus", this);
+    }
+    this.value = this.input.value.trim();
+  }
+}
+customElements.define("editable-item", EditableItem);

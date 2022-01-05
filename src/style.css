@@ -1,19 +1,26 @@
 html, body {
   margin: 0; padding: 0;
-  overflow: hidden;
-  width: 100%;
-  height: 100%;
+  font-size: 18px;
 }
 
-header > h2 {
-  margin: 0;
+body {
+  display: flex;
+  justify-content: center;
+  flex-direction: row;
+  background-color: black;
+  color: white;
 }
 
 #page-container {
-  position: relative;
+  background: green url('./assets/baize.jpg');
+  box-shadow: 0px -8px 24px 6px black inset;
+  flex: 1 1 auto;
   display: flex;
+  position: relative;
   flex-direction: column;
-  margin: 0 auto 0 auto;
+  align-items: center;
+  width: 100%;
+  min-height: 98vh;
 }
 
 #notification {
@@ -35,8 +42,17 @@ header > h2 {
 }
 
 #page-header {
-  padding-top: 0.5rem;
-  flex: 0 1 13vh;
+  font-size: 24px;
+  display: block;
+  position: fixed;
+  left: 0;
+  top: calc(24px * 24);
+  transform: rotate(270deg);
+  transform-origin: top left;
+  width: calc(24px * 22);
+  max-width: 100vh;
+  text-align: right;
+  white-space: nowrap;
 }
 
 #panels {
@@ -49,16 +65,47 @@ header > h2 {
   flex-direction: column;
 }
 
+.scene-panel > header {
+  align-self: flex-start;
+  flex: 0 0 4em;
+  display: flex;
+  align-items: end;
+}
+
+.scene-panel > header > h2 {
+  margin: 1.5em 0 0.5em 1.5em;
+  font-family: Roboto,sans-serif;
+  text-transform: uppercase;
+  font-size: 0.9em;
+  color: white;
+}
+
+
 .scene-panel > section.body {
-  padding: 0.5rem 1rem 1rem 0.5rem;
+  padding: 0.5rem 0 1rem 0.5rem;
   flex: 1 1 0;
   text-align: center;
   display: flex;
   flex-direction: column;
+  min-width: 800px;
+  min-height: 600px;
 }
 
 .scene-panel > footer {
-  flex: 0 1 0;
+  flex: 0 0 6em;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0.5rem 0 1rem 0.5rem;
+  margin-bottom: 20px;
+}
+
+.scene-panel > footer > button.primary-action {
+  min-height: 2em;
+  font-size: 1.6em;
+  border-radius: 8px;
+  border: 1px solid black;
+  background-color: goldenrod;
 }
 
 .scene-panel.hidden {
@@ -84,27 +131,33 @@ section.body > .body-lower {
   transform: translateX(-100vw);
 }
 
-body {
-  background-color: #eee;
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: center;
-}
-
-
 h1 {
   font-family: cursive;
+  font-size: 5em;
+  color: rgba(0,0,0,0.33);
+  margin: 0;
 }
 
+.userlist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid black;
+  border-radius: 8px
+}
+
+/* The card-play scene */
+#cardplay.scene-panel > section.body {
+  position: relative;
+  overflow: unset;
+  flex-direction: row;
+}
 
 #table {
   display: block;
   position: relative;
   width: 800px;
   height: 600px;
-  background-color: #090;
-  box-shadow: 2px 1px 12px inset black;
 
   -webkit-touch-callout: none; /* iOS Safari */
     -webkit-user-select: none; /* Safari */
@@ -146,4 +199,85 @@ h1 {
   color: black;
 }
 
+#userSidebar {
+  flex: 1 1 auto;
+}
+#userStatus {
+}
+
+#userSidebar > #userStatus > li {
+  padding: 0.5em 1em;
+  font-size: smaller;
+  min-width: 14em;
+  text-align: left;
+
+  background-color: rgba(0,0,0,0.4);
+  color: #fff;
+  margin: 1px 0;
+}
+
+#userStatus > li:first-of-type {
+  border-radius: 8px 8px 0 0;
+}
+#userStatus > li:last-of-type {
+  border-radius: 0 0 8px 8px;
+}
+
+/* The lobby scene */
+#lobby.scene-panel > section.body {
+  min-height: min-content; /* needs vendor prefixes */
+}
+
+editable-item {
+  position: relative;
+  min-height: 2em;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: stretch;
+  column-gap: 8px;
+}
+
+editable-item:first-of-type > input {
+  border-radius: 8px 8px 0 0;
+}
+editable-item:last-of-type > input {
+  border-radius: 0 0 8px 8px;
+}
+
+editable-item > input {
+  padding: 1.5em 1em;
+  border: none;
+  flex: 1 1 auto;
+  color: #000;
+  background: rgba(255,255,255,0.8);
+  font-size: 1.2em;
+}
+
+editable-item[data-remote="true"] > input {
+  background: transparent;
+  color: #fff;
+}
+editable-item[data-remote="true"] > button {
+  display: none;
+}
+
+editable-item > button {
+  border-radius: 4px;
+  padding: 2px 1em;
+  flex: 1 1 auto;
+}
+
+editable-item:not([editing]) > button {
+  display: none;
+}
+
+#playersjoined > editable-item {
+  display: flex;
+  margin: 1px;
+  background: rgba(0,0,0,0.3);
+}
+
+#playersjoined > editable-item[data-remote="true"] {
+  opacity: 0.6;
+}
 
