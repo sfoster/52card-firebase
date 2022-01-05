@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+  <script type="module">
+    // Import the functions you need from the SDKs you need
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+    // import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-analytics.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyA4KZtIFBoZ74qP56DVBtXERNhcsqXgdxQ",
+      authDomain: "card-pickup.firebaseapp.com",
+      projectId: "card-pickup",
+      storageBucket: "card-pickup.appspot.com",
+      messagingSenderId: "138680930463",
+      appId: "1:138680930463:web:cc3bf3d1b2823bde5dd2aa",
+      measurementId: "G-EYZX3ZDY12"
+    };
+
+    // Initialize Firebase services
+    const firebaseApp = initializeApp(firebaseConfig);
+    const authService = getAuth();
+    const remoteStore = getFirestore();
+
+    console.log("firebaseApp", firebaseApp);
+    console.log("authService", authService);
+    console.log("remoteStore", remoteStore);
+
+    // Initialize the FirebaseUI Widget using Firebase.
+    document.addEventListener("DOMContentLoaded", init);
+  
+    class App {
+      initialize() {
+        this.elements = {
+          "login": document.querySelector("#login-anon"),
+        };
+        this.elements.login.addEventListener("click", this);
+      }
+      handleEvent(e) {
+        switch (e.target) {
+          case this.elements.login:
+            this.attemptLogin();
+        }
+        console.log("Got event:", e);
+      }
+      async attemptLogin() {
+        if (!this.user) {
+          let result = await signInAnonymously(authService);
+          console.log("auth result:", result);
+          if (result && result.user) {
+            this.user = new GameUser();
+            this.user.initialize(result.user);
+          }
+        }
+      }
+    }
+
+/*
+
+
+$scope.loginObj.$login('anonymous').then(function(user) {
+  if (!user) return;
+  $scope.userRef = (new Firebase('<Your Firebase>.firebaseio.com/users/')).child(user.uid);
+  $scope.userRef.child('displayName').on('value', function (snapshot) {
+    user.displayName = shapshot.val();
+  });
+});
+
+// Then elsewhere in your code, set the display name and user.displayName will be updated automatically
+
+$scope.userRef.child('displayName').set("DISPLAY NAME");
+
+*/    
+
+    class GameUser {
+      initialize(user) {
+        this.uid = user.uid;
+        this.displayName = user.displayName;
+        if (!this.displayName) {
+          this.update({ displayName: "GummyBear" });
+        }
+      }
+      async update({ displayName }) {
+        // Add a new document in collection "players"
+        try {
+          await setDoc(doc(remoteStore, "players", this.uid), {
+            displayName,
+            uid: this.uid,
+            lastSeen: Date.now(),
+          });
+          this.displayName = displayName;
+        } catch (ex) {
+          console.warn("Failed to update player doc:", ex);
+        }
+        this.render();
+      }
+      render() {
+        document.querySelector("#user-name").textContent = this.displayName;
+      }
+    }
+
+    function init() {
+      let app = window._app = new App();
+      app.initialize();
+    }
+  </script>
+</head>
+<body>
+  <button id="login-anon">Login (Anonymously)</button>
+  <section id="user-info">
+    <div id="user-avatar">🧑</div>
+    <div id="user-name"></div>
+  </section>
+</body>
+</html>
