@@ -1,3 +1,15 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  collection,
+  query,
+  getDocs,
+  where
+} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
 function shuffleArray(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -55,12 +67,133 @@ class Store {
   }
 }
 
+let _clientInstance;
+let _fakeclientInstance;
+
 class Client {
   constructor(config) {
     this.config = config;
     this.entries = [];
     this.byId = {};
     this._topics = new Set();
+    this.error = null;
+  }
+  static getInstance(config) {
+    if (!_clientInstance) {
+      _clientInstance = new Client(config);
+    }
+    return _clientInstance;
+  }
+  async initialize() {
+    if (this._initialized) {
+      return;
+    }
+    this.firebaseApp = initializeApp(firebaseConfig);
+    this.authService = getAuth();
+    this.remoteStore = getFirestore();
+    this._initialized = true;
+  }
+  listen(name) {
+    if (this._topics.has(name)) {
+      return;
+    }
+    this._topics.add(name);
+    document.addEventListener(name, this);
+  }
+  removeListener(name) {
+    this._topics.delete(name);
+    document.removeEventListener(name, this);
+  }
+  async updateRemoteDocument(collectionId, docId, updateProps) {
+    await setDoc(doc(this.remoteStore, collectionId, docId), updateProps);
+  }
+  async getGameToEnter() {
+    const gamesRef = collection(this.remoteStore, "games");
+    // get only the games which haven't started yet
+    const q = query(gamesRef, where("state", "==", 0));
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.size) {
+      const game = querySnapshot.docs[0];
+      return { id: game.id, ...game.data() };
+    } else {
+      TODO("Create a new game document");
+    }
+  }
+  async createGame() {
+    const gamesRef = collection(this.remoteStore, "games");
+    // get only the games which haven't started yet
+    const q = query(gamesRef, where("state", "==", 0));
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.size) {
+      const game = querySnapshot.docs[0];
+      return { id: game.id, ...game.data() };
+    } else {
+      TODO("Create a new game document");
+    }
+  }
+  query(params) {
+
+  }
+  status() {
+    this.initialize();
+    return new Promise((resolve, reject) => {
+      if (
+        this.firebaseApp &&
+        this.authService &&
+        this.remoteStore &&
+        !this.error
+      ) {
+        resolve({ ok: true });
+      } else {
+        reject(this.error);
+      }
+    });
+  }
+  async signIn() {
+    let result = await signInAnonymously(this.authService);
+    return result?.user;
+  }
+  fetchUsers(createFakes) {
+    // generate data locally for now
+    // add some fake users so we can see what it might look like
+    const users = [];
+    if (createFakes) {
+      for (let i=0; i<8; i++) {
+        users.push({
+          uid: (Math.random() * 1000).toFixed(1),
+          displayName: mnemonic.encode([
+            Math.floor(Math.random() * 256),
+            Math.floor(Math.random() * 256),
+            Math.floor(Math.random() * 256),
+            Math.floor(Math.random() * 256),
+          ],  "x x-x").replace(/\b([a-z])/g, (m, initialLetter) => initialLetter.toUpperCase()),
+          score: Math.floor(Math.random() * 26),
+        });
+      }
+    }
+
+    return new Promise((res, rej) => {
+      setTimeout(() => res({
+        added: users,
+        status: users
+      }), 60);
+    });
+  }
+
+}
+
+class FakeClient {
+  constructor(config) {
+    this.config = config;
+    this.entries = [];
+    this.byId = {};
+    this._topics = new Set();
+  }
+  static getInstance(config) {
+    if (!_fakeclientInstance) {
+      _fakeclientInstance = new FakeClient(config);
+    }
+    return _fakeclientInstance;
   }
   listen(name) {
     if (this._topics.has(name)) {
@@ -122,7 +255,7 @@ class Client {
       res({ id });
     });
   }
-  fetchUserData() {
+  fetchUsers() {
     // generate data locally for now
     // add some fake users so we can see what it might look like
     const users = [];
@@ -153,3 +286,11 @@ class Client {
   }
 }
 
+function getClient(config = {}) {
+  if (config.kind == "fake") {
+    return FakeClient.getInstance();
+  }
+  return Client.getInstance(config);
+}
+
+export default getClient;

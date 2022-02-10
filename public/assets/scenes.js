@@ -1,3 +1,7 @@
+import  {default as GameUser} from './user.js';
+
+const SceneExports = {};
+
 class Scene {
   constructor(elem, options={}) {
     this.elem = elem;
@@ -25,6 +29,12 @@ class Scene {
   }
   enter(params = {}) {
     this._active = true;
+    if (params.client) {
+      this.client = params.client;
+    }
+    if (params.game) {
+      this.game = params.game;
+    }
     this.elem.addEventListener("click", this);
     this.elem.classList.remove("hidden");
     document.body.dataset.scene = this.id;
@@ -44,7 +54,7 @@ class Scene {
     }
   }
 }
-
+SceneExports.Scene = Scene;
 /*
  * Initial scene checks configurations, server availability etc.
  * Forwards to Lobby scene if it all checks out
@@ -53,17 +63,29 @@ class InitializeScene extends Scene {
   enter(params = {}) {
     super.enter(params);
     this.client.status().then(result => {
-      if (result.ok) {
-        this.statusOk(result);
-      } else {
-        this.statusNotOk(result);
+      if (!result || !result.ok) {
+        return this.statusNotOk(result);
       }
+      this.statusOk(result);
     }).catch(ex =>{
       console.warn("Exception entering scene: ", ex);
       this.statusNotOk(ex);
     })
   }
-  statusOk(statusData) {
+  async statusOk(statusData) {
+    if (this.game.user) {
+      this.getGameToEnter();
+    } else {
+      let remoteUser = await this.client.signIn();
+      console.log("signIn result:", remoteUser);
+      if (!remoteUser) {
+        throw new Error("Failed to sign in as anonymous user");
+      }
+      this.game.user = new GameUser();
+      await this.game.user.initialize(remoteUser);
+      await this.client.getGameToEnter();
+    }
+    console.log("user displayName:", this.game.user.displayName);
     this.game.switchScene("lobby", statusData);
   }
   statusNotOk(statusResult){
@@ -75,13 +97,14 @@ class InitializeScene extends Scene {
     }
   }
 }
+SceneExports.InitializeScene = InitializeScene;
 
 class LobbyScene extends Scene {
   enter(params = {}) {
     super.enter(params);
     this.userList = this.elem.querySelector("#playersjoined");
     this.addUser({ id: "playerone", name: "", placeholder: "Your name goes here" });
-    this.client.fetchUserData().then(data => {
+    this.client.fetchUsers().then(data => {
       for (let user of data.added) {
         this.addUser(Object.assign(user, { remote: true }));
       }
@@ -96,6 +119,7 @@ class LobbyScene extends Scene {
     console.log("Adding user: ", item, name, remote);
   }
 }
+SceneExports.LobbyScene = LobbyScene;
 
 class CardPlayScene extends Scene {
   async enter(params = {}) {
@@ -137,9 +161,11 @@ class CardPlayScene extends Scene {
     }
   }
 }
+SceneExports.CardPlayScene = CardPlayScene;
 
 class GameOverScene extends Scene {
 }
+SceneExports.GameOverScene = GameOverScene;
 
 class NotAvailableScene extends Scene {
   constructor(elem, options) {
@@ -187,4 +213,7 @@ class NotAvailableScene extends Scene {
     this.elem.querySelector(".body-upper").className = "body-upper";
   }
 }
+SceneExports.NotAvailableScene = NotAvailableScene;
 
+
+export default SceneExports;

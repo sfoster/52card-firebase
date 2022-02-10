@@ -1,3 +1,6 @@
+import  {default as Scene} from './scenes.js';
+import getClient from './client.js';
+
 class Game {
   constructor(elem, options = {}) {
     this.elem = elem || document.body;
@@ -43,20 +46,20 @@ window.config = {};
 window.onload = function() {
   const game = window.game = new Game();
 
-  const client =  game.client = new Client(window.config);
+  const client =  game.client = getClient(window.config);
   const sceneArgs = {
     game, client
   };
 
   game.registerScene(
     "lobby",
-    new LobbyScene(document.getElementById("lobby"),
+    new Scene.LobbyScene(document.getElementById("lobby"),
                      Object.assign({}, sceneArgs, { id: "lobby" }))
   );
 
   game.registerScene(
     "cardplay",
-    new CardPlayScene(
+    new Scene.CardPlayScene(
       document.getElementById("cardplay"),
       Object.assign({}, sceneArgs, {
         id: "cardplay",
@@ -66,7 +69,7 @@ window.onload = function() {
 
   game.registerScene(
     "gameover",
-    new GameOverScene(
+    new Scene.GameOverScene(
       document.getElementById("gameover"),
       Object.assign({}, sceneArgs, {
         id: "gameover"
@@ -76,7 +79,7 @@ window.onload = function() {
 
   game.registerScene(
     "notavailable",
-    new NotAvailableScene(
+    new Scene.NotAvailableScene(
       document.getElementById("notavailable"),
       Object.assign({}, sceneArgs, { id: "notavailable" })
     )
@@ -84,7 +87,7 @@ window.onload = function() {
 
   game.registerScene(
     "startup",
-    new InitializeScene(document.getElementById("initializing"),
+    new Scene.InitializeScene(document.getElementById("initializing"),
               Object.assign({}, sceneArgs, { id: "startup" }))
   );
 
