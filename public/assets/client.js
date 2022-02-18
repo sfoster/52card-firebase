@@ -6,7 +6,8 @@ import {
   collection,
   query,
   getDocs,
-  where
+  where,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 import { getAuth, signInAnonymously, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
@@ -17,70 +18,20 @@ function shuffleArray(arr) {
   }
 }
 
-class Store {
-  constructor(config) {
-    this._items = [];
-    this._byId = new Map();
-  }
-  query(params) {
-    const result = this._rows.filter(item => {
-      return item;
-    });
-    return new Promise(res => {
-      setTimeout(() => res(result), 60);
-    });
-  }
-  update(itemAction) {
-    let id = itemAction.id;
-    let result = { added: [], removed: [], status: [] };
-    switch (itemAction.action) {
-      case "remove":
-        let idx = this._items.findIndex(item => item.id == id);
-        this._items.splice(idx, 1);
-        delete this._byId[id];
-        result.removed.push({ id });
-        break;
-      case "add": {
-        let entry = Object.assign({}, itemAction.data);
-        let idx = this._items.findIndex(item => item.id == id);
-        this._items.push(entry);
-        this._byId[entry.id] = entry;
-        result.added.push(entry);
-        break;
-      }
-      case "update": {
-        let entry = this._byId[id];
-        Object.assign(entry, data);
-        result.status.push(Object.assign({}, entry));
-        break;
-      }
-    }
-    return new Promise(res => {
-      setTimeout(() => res(Object.assign(result, { status: "ok" })), 60);
-    });
-  }
-  notify(topic, data) {
-    const event = new CustomEvent(topic, {
-      detail: data
-    });
-    document.dispatchEvent(event);
-  }
-}
-
 let _clientInstance;
 let _fakeclientInstance;
 
-class Client {
+class FirebaseClient {
   constructor(config) {
     this.config = config;
     this.entries = [];
     this.byId = {};
-    this._topics = new Set();
+    this._remoteChangeListeners = new Map();
     this.error = null;
   }
   static getInstance(config) {
     if (!_clientInstance) {
-      _clientInstance = new Client(config);
+      _clientInstance = new FirebaseClient(config);
     }
     return _clientInstance;
   }
@@ -93,46 +44,111 @@ class Client {
     this.remoteStore = getFirestore();
     this._initialized = true;
   }
-  listen(name) {
-    if (this._topics.has(name)) {
+  buildQuery(queryParams) {
+    const q = query(
+      collection(this.remoteStore, queryParams.collectionId),
+      where(...queryParams.whereTerms)
+    );
+    return q;
+  }
+  _makeKeyFromQuery(query) {
+    if (query.type == "query") {
+      let params = {
+        path: query._query.path,
+        collectionGroup: query._query.collectionGroup,
+        explicitOrderBy: query._query.explicitOrderBy,
+        filters: query._query.filters
+      };
+      return JSON.stringify(params);
+    } else {
+      return JSON.stringify(query);
+    }
+  }
+  addChangeListener(queryParams = {}, listener, label) {
+    let changeQuery;
+    let topicKey = this._makeKeyFromQuery(queryParams);
+    if (!label) {
+      label = topicKey;
+    }
+    let entry;
+    let unsubscriber;
+    let listeners;
+
+    console.log("addChangeListener, type:", queryParams.type, label);
+    if (queryParams.type == "query") {
+      changeQuery = queryParams;
+    } else {
+      let { collectionId, docId } = queryParams;
+      if (!(collectionId && docId)) {
+        throw new Error(`CollectionId (${collectionId}) and docId (${docId}) must be supplied.`);
+      }
+      changeQuery = doc(this.remoteStore, collectionId, docId)
+    }
+    if (this._remoteChangeListeners.has(topicKey)) {
+      // we are already watching for this snapshot
+      entry = this._remoteChangeListeners.get(topicKey);
+      unsubscriber = entry.unsubscriber;
+      listeners = entry.listeners;
+    } else {
+      unsubscriber = onSnapshot(changeQuery, (result) => {
+        if (queryParams.type == "query") {
+          let results = [];
+          result.forEach(doc => {
+            results.push(doc.data());
+          });
+          this.onRemoteChange(topicKey, results);
+        } else {
+          const doc = result;
+          const source = doc.metadata.hasPendingWrites ? "Local" : "Server";
+          if (!doc.metadata.hasPendingWrites) {
+            this.onRemoteChange(topicKey, doc.data(), source);
+          }
+        }
+      });
+      entry = {
+        unsubscriber,
+        listeners: new Map(),
+      };
+      this._remoteChangeListeners.set(topicKey, entry);
+    }
+    entry.listeners.set(label || topicKey, listener);
+  }
+  removeChangeListener(queryParams, listener, label) {
+    console.log("removeChangeListener, type:", queryParams.type, label);
+    let topicKey = this._makeKeyFromQuery(queryParams);
+    if (!label) {
+      label = topicKey;
+    }
+    const entry = this._remoteChangeListeners.get(topicKey);
+    if (!entry) {
+      console.log("No change listener for:", topicKey);
       return;
     }
-    this._topics.add(name);
-    document.addEventListener(name, this);
+    if (entry.listeners.has(label)) {
+      entry.listeners.delete(label);
+    }
+    if (!entry.listeners.size) {
+      entry.unsubscriber();
+      this._remoteChangeListeners.delete(topicKey);
+    }
   }
-  removeListener(name) {
-    this._topics.delete(name);
-    document.removeEventListener(name, this);
+  onRemoteChange(topicKey, data, source) {
+    console.log("onRemoteChange: ", topicKey, data, source);
+    const entry = this._remoteChangeListeners.get(topicKey);
+    if (!entry) {
+      console.log("No entry for document change: ", topicKey);
+      return;
+    }
+    entry.listeners.forEach((listener, label) => {
+      if (typeof listener.handleChange == "function") {
+        listener.handleChange(label, data);
+      } else {
+        listener(label, data);
+      }
+    });
   }
-  async updateRemoteDocument(collectionId, docId, updateProps) {
+  async updateDocument(collectionId, docId, updateProps) {
     await setDoc(doc(this.remoteStore, collectionId, docId), updateProps);
-  }
-  async getGameToEnter() {
-    const gamesRef = collection(this.remoteStore, "games");
-    // get only the games which haven't started yet
-    const q = query(gamesRef, where("state", "==", 0));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.size) {
-      const game = querySnapshot.docs[0];
-      return { id: game.id, ...game.data() };
-    } else {
-      TODO("Create a new game document");
-    }
-  }
-  async createGame() {
-    const gamesRef = collection(this.remoteStore, "games");
-    // get only the games which haven't started yet
-    const q = query(gamesRef, where("state", "==", 0));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.size) {
-      const game = querySnapshot.docs[0];
-      return { id: game.id, ...game.data() };
-    } else {
-      TODO("Create a new game document");
-    }
-  }
-  query(params) {
-
   }
   status() {
     this.initialize();
@@ -150,6 +166,7 @@ class Client {
     });
   }
   async signIn() {
+    await this.initialize();
     let result = await signInAnonymously(this.authService);
     return result?.user;
   }
@@ -290,7 +307,7 @@ function getClient(config = {}) {
   if (config.kind == "fake") {
     return FakeClient.getInstance();
   }
-  return Client.getInstance(config);
+  return FirebaseClient.getInstance(config);
 }
 
 export default getClient;

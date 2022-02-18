@@ -73,9 +73,7 @@ class InitializeScene extends Scene {
     })
   }
   async statusOk(statusData) {
-    if (this.game.user) {
-      this.getGameToEnter();
-    } else {
+    if (!this.game.user) {
       let remoteUser = await this.client.signIn();
       console.log("signIn result:", remoteUser);
       if (!remoteUser) {
@@ -83,7 +81,6 @@ class InitializeScene extends Scene {
       }
       this.game.user = new GameUser();
       await this.game.user.initialize(remoteUser);
-      await this.client.getGameToEnter();
     }
     console.log("user displayName:", this.game.user.displayName);
     this.game.switchScene("lobby", statusData);
@@ -93,7 +90,7 @@ class InitializeScene extends Scene {
       game.switchScene("notavailable", { heading: "Status Error", message: statusResult.message, });
     } else if (statusResult && !statusResult.ok) {
       // TODO: we do have more fine-grained status data available for a more accurate message?
-      game.switchScene("notavailable", { heading: "Offline", message: "ColorLaunch is Offline right now, please come back later", });
+      game.switchScene("notavailable", { heading: "Offline", message: "52-Pickup is Offline right now, please come back later", });
     }
   }
 }
@@ -101,10 +98,13 @@ SceneExports.InitializeScene = InitializeScene;
 
 class LobbyScene extends Scene {
   enter(params = {}) {
+    console.log("LobbyScene, got params", params);
     super.enter(params);
     this.userList = this.elem.querySelector("#playersjoined");
     this.addUser({ id: "playerone", name: "", placeholder: "Your name goes here" });
-    this.client.fetchUsers().then(data => {
+
+
+    this.client.enrollUser().then(data => {
       for (let user of data.added) {
         this.addUser(Object.assign(user, { remote: true }));
       }

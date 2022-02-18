@@ -2,11 +2,11 @@ const __adjectives = [
   "funny", "wierd", "unusual", "strange", "peculiar",
   "fabled", "notable", "well known", "famous", "noted",
   "ancient", "great", "vast", "pink",
-  "fabulous", "exotic", "hoopy", "unusual", "exciting",
+  "fabulous", "exotic", "hoopy", "exciting",
   "unremarkable", "boring", "dull", "tedious", "revolting",
   "occasional", "unpredictable", "dreadful", "deadly",
   "edible", "spotted",
-  "ancient", "exceptional", "eccentric", "ingrained",
+  "ancient", "exceptional", "eccentric", "tasty",
   "killer", "deadly", "evil", "lethal", "vicious"
 ];
 const __nouns = [
