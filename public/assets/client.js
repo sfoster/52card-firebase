@@ -5,6 +5,7 @@ import {
   setDoc,
   collection,
   query,
+  getDoc,
   getDocs,
   where,
   onSnapshot
@@ -74,35 +75,44 @@ class FirebaseClient {
     let unsubscriber;
     let listeners;
 
-    console.log("addChangeListener, type:", queryParams.type, label);
     if (queryParams.type == "query") {
+      console.log("addChangeListener for query", queryParams, listener, label);
       changeQuery = queryParams;
     } else {
+      console.log("addChangeListener for doc", queryParams, listener, label);
       let { collectionId, docId } = queryParams;
       if (!(collectionId && docId)) {
         throw new Error(`CollectionId (${collectionId}) and docId (${docId}) must be supplied.`);
       }
-      changeQuery = doc(this.remoteStore, collectionId, docId)
+      // implicitly creates the document if it doesnt already exist
+      changeQuery = doc(this.remoteStore, collectionId, docId);
     }
     if (this._remoteChangeListeners.has(topicKey)) {
+      console.log("addChangeListener: we are already watching changes to this snapshot", changeQuery);
       // we are already watching for this snapshot
       entry = this._remoteChangeListeners.get(topicKey);
       unsubscriber = entry.unsubscriber;
       listeners = entry.listeners;
     } else {
-      unsubscriber = onSnapshot(changeQuery, (result) => {
-        if (queryParams.type == "query") {
-          let results = [];
-          result.forEach(doc => {
-            results.push(doc.data());
-          });
-          this.onRemoteChange(topicKey, results);
-        } else {
-          const doc = result;
-          const source = doc.metadata.hasPendingWrites ? "Local" : "Server";
-          if (!doc.metadata.hasPendingWrites) {
-            this.onRemoteChange(topicKey, doc.data(), source);
+      console.log("addChangeListener: adding subscriber to changes to this snapshot", changeQuery);
+      unsubscriber = onSnapshot(changeQuery, {
+        next: (result) => {
+          if (queryParams.type == "query") {
+            let results = [];
+            result.forEach(doc => {
+              results.push(doc.data());
+            });
+            this.onRemoteChange(topicKey, results);
+          } else {
+            // result is a DocumentReference
+            const source = result.metadata.hasPendingWrites ? "Local" : "Server";
+            if (!result.metadata.hasPendingWrites) {
+              this.onRemoteChange(topicKey, result.data(), source);
+            }
           }
+        },
+        error: (err) => {
+          console.warn("onSnapshot error:", err);
         }
       });
       entry = {
@@ -140,6 +150,7 @@ class FirebaseClient {
       return;
     }
     entry.listeners.forEach((listener, label) => {
+      console.log("onRemoteChange, calling listener: ", listener, label);
       if (typeof listener.handleChange == "function") {
         listener.handleChange(label, data);
       } else {
@@ -148,7 +159,28 @@ class FirebaseClient {
     });
   }
   async updateDocument(collectionId, docId, updateProps) {
+    console.log("updateDocument:", collectionId, docId, updateProps);
     await setDoc(doc(this.remoteStore, collectionId, docId), updateProps);
+  }
+  async getOrCreateDocument(collectionId, docId, initialData) {
+    const docRef = doc(this.remoteStore, collectionId, docId);
+    const snapshot = await getDoc(docRef);
+    console.log("getOrCreateDocument got snapshot", snapshot);
+    if (snapshot.exists()) {
+      console.log("getOrCreateDocument, exists, returning data", snapshot.data());
+      return snapshot.data();
+    }
+    console.log("getOrCreateDocument, creating doc with initialData", initialData);
+    return addDoc(docRef, initialData).then(_ => {
+      console.log("getOrCreateDocument, addDoc resolved, returning initialData", initialData);
+      return initialData;
+    }).catch(ex => {
+      console.warn("getOrCreateDocument: failed to addDoc at: ", collectionId, docId, ex);
+    });
+  }
+
+  async getDocumentData(collectionId, docId) {
+    return getDoc(doc(this.remoteStore, collectionId, docId));
   }
   status() {
     this.initialize();
@@ -167,8 +199,8 @@ class FirebaseClient {
   }
   async signIn() {
     await this.initialize();
-    let result = await signInAnonymously(this.authService);
-    return result?.user;
+    let userCredential = await signInAnonymously(this.authService);
+    return userCredential?.user;
   }
   fetchUsers(createFakes) {
     // generate data locally for now

@@ -15,61 +15,59 @@
   <script type="module" src="./assets/client.js"></script>
   <script type="module">
     import getClient from './assets/client.js';
+    import Player from './assets/player.js';
 
     const client = window.gClient = getClient(window.config);
 
     (async function() {
       await client.initialize();
-      let remoteUser = await client.signIn();
+      const remoteUser = await client.signIn();
       console.log("remoteUser:", remoteUser);
 
-      let uid = remoteUser.uid;
-      let displayName = mnemonic.encode([
-        uid.charCodeAt(0),
-        uid.charCodeAt(1),
-        uid.charCodeAt(uid.length-1),
-        uid.charCodeAt(Math.floor(Math.random() * uid.length))
-      ],  "x x-x").replace(/\b([a-z])/g, (m, initialLetter) => initialLetter.toUpperCase());
-      console.log("displayName:", displayName);
+      const player = window.gPlayer = new Player(client, { 
+        collectionId: "players",
+        docId: remoteUser.uid,
+      });
 
-      const changeListener = {
-        handleChange(label, data) {
-          switch (label) {
-            case "self-change":
-              console.log("The user document got an update:", data);
-              break;
-            case "some-players":
-              console.log("The some-players query got an update:", data);
-              break;
-            default: 
-              console.info("changeListener got some change: ", label, data);
-          }
-        }
-      }
-      await client.addChangeListener({ collectionId: "players", docId: remoteUser.uid }, changeListener, "self-change");
+      // const changeListener = {
+      //   handleChange(label, data) {
+      //     switch (label) {
+      //       case "self-change":
+      //         console.log("The player document got an update:", data);
+      //         document.querySelector("#player-name").textContent = data.
+      //         break;
+      //       case "some-players":
+      //         console.log("The some-players query got an update:", data);
+      //         break;
+      //       default: 
+      //         console.info("changeListener got some change: ", label, data);
+      //     }
+      //   }
+      // }
+      console.log("initializing player");
+      await player.initialize();
+      console.log("displayName:", player.displayName);
 
-      let somePlayersQuery = gClient.buildQuery({ collectionId: "players", whereTerms: ["uid", "!=", remoteUser.uid] });
-      client.addChangeListener(somePlayersQuery, changeListener, "some-players");
+      // let somePlayersQuery = gClient.buildQuery({ collectionId: "players", whereTerms: ["uid", "!=", remoteUser.uid] });
+      // client.addChangeListener(somePlayersQuery, changeListener, "some-players");
 
-      try {
-        await client.updateDocument("players", remoteUser.uid, {
-          displayName,
-          lastSeen: Date.now()
-        });
-      } catch (ex) {
-        console.warn("Failed to create/update user document: ", ex);
-        return 
-      }
+      // await new Promise(res => setTimeout(res, 2000));
+      // try {
+      //   await user.update({ score: user.score + 1 });
+      // } catch (ex) {
+      //   console.warn("Failed to create/update user document: ", ex);
+      //   return 
+      // }
 
-      await new Promise(res => setTimeout(res, 5000));
-      console.log("somePlayersQuery:", JSON.stringify(somePlayersQuery));
-      client.removeChangeListener(somePlayersQuery, changeListener, "some-players");
+      await new Promise(res => setTimeout(res, 2000));
+      // client.removeChangeListener(somePlayersQuery, changeListener, "some-players");
     })();
   </script>
 </head>
 
 <body>
 <div id="page-container">
+  <h1>Player <span id="player-name"></span></h1>
 </div>
 </body>
 </html>
