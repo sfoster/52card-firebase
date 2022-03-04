@@ -17,7 +17,7 @@ class RemoteDocument {
     const data = await this._client.getOrCreateDocument(collectionId, docId, initialData);
     this._remoteDocumentData = data;
     console.log("RemoteDocument#initialize, getOrCreateDocument callback got data", this._remoteDocumentData);
-    this.listen(`/${collectionId}/${docId}/self-change`);
+    this.listen(`/${collectionId}/${this.id}/self-change`);
   }
   listen(topic) {
     const [_, collectionId, docId, label] = topic.split("/");
@@ -42,10 +42,10 @@ class RemoteDocument {
     this._changeListenerLabels.delete(label);
   }
   update(changes = {}) {
-    let { collectionId, docId } = this._options;
+    let { collectionId } = this._options;
     changes.lastSeen = Date.now();
     console.log("calling updateDocument with changes", changes);
-    return this._client.updateDocument(collectionId, docId, changes);
+    return this._client.updateDocument(collectionId, this.id, changes);
   }
   handleChange(label, data) {
     if (!this._changeListenerLabels.has(label)) {

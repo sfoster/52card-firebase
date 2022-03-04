@@ -2,6 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase
 import {
   getFirestore,
   doc,
+  addDoc,
   setDoc,
   collection,
   query,
@@ -46,10 +47,18 @@ class FirebaseClient {
     this._initialized = true;
   }
   buildQuery(queryParams) {
-    const q = query(
-      collection(this.remoteStore, queryParams.collectionId),
-      where(...queryParams.whereTerms)
-    );
+    let q;
+    if (queryParams.whereTerms) {
+      q = query(
+        collection(this.remoteStore, queryParams.collectionId),
+        where(...queryParams.whereTerms)
+      );
+    } else {
+      q = query(
+        collection(this.remoteStore, queryParams.collectionId)
+      );
+    }
+    console.log("Returning q:", q);
     return q;
   }
   _makeKeyFromQuery(query) {
@@ -75,18 +84,24 @@ class FirebaseClient {
     let unsubscriber;
     let listeners;
 
-    if (queryParams.type == "query") {
-      console.log("addChangeListener for query", queryParams, listener, label);
-      changeQuery = queryParams;
-    } else {
-      console.log("addChangeListener for doc", queryParams, listener, label);
-      let { collectionId, docId } = queryParams;
-      if (!(collectionId && docId)) {
-        throw new Error(`CollectionId (${collectionId}) and docId (${docId}) must be supplied.`);
+    switch (queryParams.type) {
+      case "query":
+      case "collection": {
+        console.log("addChangeListener for type", queryParams.type, queryParams, listener, label);
+        changeQuery = queryParams;
+        break;
       }
-      // implicitly creates the document if it doesnt already exist
-      changeQuery = doc(this.remoteStore, collectionId, docId);
+      default: {
+        console.log("addChangeListener for doc", queryParams, listener, label);
+        let { collectionId, docId } = queryParams;
+        if (!(collectionId && docId)) {
+          throw new Error(`collectionId (${collectionId}) and docId (${docId}) must be supplied.`);
+        }
+        // implicitly creates the document if it doesnt already exist
+        changeQuery = doc(this.remoteStore, collectionId, docId);
+      }
     }
+
     if (this._remoteChangeListeners.has(topicKey)) {
       console.log("addChangeListener: we are already watching changes to this snapshot", changeQuery);
       // we are already watching for this snapshot
@@ -94,20 +109,28 @@ class FirebaseClient {
       unsubscriber = entry.unsubscriber;
       listeners = entry.listeners;
     } else {
-      console.log("addChangeListener: adding subscriber to changes to this snapshot", changeQuery);
+      console.log("addChangeListener: adding subscriber to changes to this snapshot", changeQuery, topicKey);
       unsubscriber = onSnapshot(changeQuery, {
         next: (result) => {
-          if (queryParams.type == "query") {
+          if (queryParams.type == "query" || queryParams.type == "collection") {
             let results = [];
             result.forEach(doc => {
-              results.push(doc.data());
+              const id = doc._key.path.segments[doc._key.path.segments.length -1];
+              results.push({
+                id,
+                ...doc.data(),
+              });
             });
             this.onRemoteChange(topicKey, results);
           } else {
             // result is a DocumentReference
             const source = result.metadata.hasPendingWrites ? "Local" : "Server";
             if (!result.metadata.hasPendingWrites) {
-              this.onRemoteChange(topicKey, result.data(), source);
+              const id = result._key.path.segments[result._key.path.segments.length -1];
+              this.onRemoteChange(topicKey, {
+                id,
+                ...result.data(),
+              }, source);
             }
           }
         },
@@ -163,39 +186,57 @@ class FirebaseClient {
     await setDoc(doc(this.remoteStore, collectionId, docId), updateProps);
   }
   async getOrCreateDocument(collectionId, docId, initialData) {
-    const docRef = doc(this.remoteStore, collectionId, docId);
-    const snapshot = await getDoc(docRef);
-    console.log("getOrCreateDocument got snapshot", snapshot);
-    if (snapshot.exists()) {
-      console.log("getOrCreateDocument, exists, returning data", snapshot.data());
-      return snapshot.data();
+    let docSnapshot;
+    if (docId) {
+      try {
+        const docRef = doc(this.remoteStore, collectionId, docId);
+        docSnapshot = await getDoc(docRef);
+      } catch (ex) {
+        console.warn("getOrCreateDocument: failed fetch doc at", collectionId, docId, ex);
+      }
+      console.log("getOrCreateDocument got snapshot", snapshot);
+      if (!(docSnapshot && docSnapshot.exists())) {
+        docSnapshot = null;
+      }
     }
-    console.log("getOrCreateDocument, creating doc with initialData", initialData);
-    return addDoc(docRef, initialData).then(_ => {
-      console.log("getOrCreateDocument, addDoc resolved, returning initialData", initialData);
-      return initialData;
-    }).catch(ex => {
-      console.warn("getOrCreateDocument: failed to addDoc at: ", collectionId, docId, ex);
-    });
+    if (!docSnapshot) {
+      console.log("getOrCreateDocument, creating doc with initialData", initialData);
+      try {
+        const docRef = await addDoc(collection(this.remoteStore, collectionId), initialData);
+        docSnapshot = await getDoc(docRef);
+      } catch (ex) {
+        console.warn("getOrCreateDocument: failed create and then fetch doc at", collectionId, ex);
+        return null;
+      }
+    }
+    const docData = {
+      id: docSnapshot.id,
+      ...docSnapshot.data()
+    };
+    console.log("getOrCreateDocument, returning docData", docData);
+    return docData;
   }
 
   async getDocumentData(collectionId, docId) {
-    return getDoc(doc(this.remoteStore, collectionId, docId));
+    let snapshot = await getDoc(doc(this.remoteStore, collectionId, docId));
+    return docData = {
+      id: snapshot.id,
+      ...snapshot.data()
+    };
   }
   status() {
-    this.initialize();
-    return new Promise((resolve, reject) => {
-      if (
-        this.firebaseApp &&
-        this.authService &&
-        this.remoteStore &&
-        !this.error
-      ) {
-        resolve({ ok: true });
-      } else {
-        reject(this.error);
-      }
-    });
+    if (
+      this.firebaseApp &&
+      this.authService &&
+      this.remoteStore &&
+      !this.error
+    ) {
+      return this.initialize().then(() => {
+        return { ok: true };
+      });
+    } else {
+      Promise.reject(this.error);
+    }
   }
   async signIn() {
     await this.initialize();

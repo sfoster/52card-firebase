@@ -1,4 +1,4 @@
-import  {default as GameUser} from './user.js';
+import Player from './player.js';
 
 const SceneExports = {};
 
@@ -62,35 +62,44 @@ SceneExports.Scene = Scene;
 class InitializeScene extends Scene {
   enter(params = {}) {
     super.enter(params);
-    this.client.status().then(result => {
-      if (!result || !result.ok) {
-        return this.statusNotOk(result);
+    let remoteUserPromise;
+    if (this.game.player) {
+      console.log("Re-visiting this scene, player already exists");
+      console.log("TODO: re-authenticate? Reset the player somehow?");
+    } else if (this.game.remoteUser) {
+      remoteUserPromise = Promise.resolve(this.game.remoteUser);
+    } else {
+      remoteUserPromise = this.client.signIn().then(remoteUser => {
+        this.game.remoteUser = remoteUser;
+      });
+    }
+    remoteUserPromise
+      .then(() => {
+        this.statusOk({ ok: true });
+      })
+      .catch((ex) => {
+        console.warn("Exception entering scene: ", ex);
+        this.statusNotOk(ex);
       }
-      this.statusOk(result);
-    }).catch(ex =>{
-      console.warn("Exception entering scene: ", ex);
-      this.statusNotOk(ex);
-    })
+    );
   }
   async statusOk(statusData) {
-    if (!this.game.user) {
-      let remoteUser = await this.client.signIn();
-      console.log("signIn result:", remoteUser);
-      if (!remoteUser) {
-        throw new Error("Failed to sign in as anonymous user");
-      }
-      this.game.user = new GameUser();
-      await this.game.user.initialize(remoteUser);
+    if (!this.game.player) {
+      const player = this.game.player = new Player(this.game.client, {
+        collectionId: "players",
+        userId: this.game.remoteUser.uid,
+      });
+      await player.initialize();
     }
-    console.log("user displayName:", this.game.user.displayName);
+    console.log("InitializeScene statusOk, switching to lobby scene");
     this.game.switchScene("lobby", statusData);
   }
   statusNotOk(statusResult){
     if (statusResult && statusResult instanceof Error) {
-      game.switchScene("notavailable", { heading: "Status Error", message: statusResult.message, });
+      this.game.switchScene("notavailable", { heading: "Status Error", message: statusResult.message, });
     } else if (statusResult && !statusResult.ok) {
       // TODO: we do have more fine-grained status data available for a more accurate message?
-      game.switchScene("notavailable", { heading: "Offline", message: "52-Pickup is Offline right now, please come back later", });
+      this.game.switchScene("notavailable", { heading: "Offline", message: "52-Pickup is Offline right now, please come back later", });
     }
   }
 }
@@ -98,25 +107,85 @@ SceneExports.InitializeScene = InitializeScene;
 
 class LobbyScene extends Scene {
   enter(params = {}) {
-    console.log("LobbyScene, got params", params);
     super.enter(params);
-    this.userList = this.elem.querySelector("#playersjoined");
-    this.addUser({ id: "playerone", name: "", placeholder: "Your name goes here" });
+    this._onExitTasks = [];
+    console.log("LobbyScene, got params", params);
+    console.log("Player", this.game.player);
 
+    this.playersList = this.elem.querySelector("#playersqueued");
 
-    this.client.enrollUser().then(data => {
-      for (let user of data.added) {
-        this.addUser(Object.assign(user, { remote: true }));
-      }
-    })
+    // let somePlayersQuery = gClient.buildQuery({
+    //   collectionId: "players",
+    //   whereTerms: ["uid", "!=", this.game.player.id] });
+    let allPlayersQuery = this.client.buildQuery({
+      collectionId: "players",
+      whereTerms: ["userId", "!=", false]
+    });
+    this.client.addChangeListener(allPlayersQuery, this, "all-players");
+
+    this._onExitTasks.push(() => {
+      console.log("exit task: unhook the allPlayersQuery listener");
+      this.client.removeChangeListener(allPlayersQuery, this, "all-players");
+    });
   }
-  addUser({ id, name, placeholder="", remote=false }) {
-    let item = new EditableItem();
-    item.remote = remote;
-    item.value = name;
-    item.placeholder = placeholder;
-    this.userList.appendChild(item);
-    console.log("Adding user: ", item, name, remote);
+  handleChange(label, data) {
+    switch (label) {
+      case "self-change":
+        console.log("The player document got an update:", data);
+        document.querySelector("#player-name").textContent = data.
+        break;
+      case "all-players":
+        console.log("The all-players query got an update:", data);
+        this.updatePlayersList(data);
+        break;
+      default:
+        console.info("changeListener got some change: ", label, data);
+    }
+  }
+  exit() {
+    let task;
+    while ((task = this._onExitTasks.shift())) {
+      task();
+    }
+  }
+  updatePlayersList(remoteData) {
+    console.log("updatePlayersList with remoteData:", remoteData);
+    const byId = {};
+    for (let item of this.playersList.querySelectorAll(".player")) {
+      byId[item.dataset.id] = item;
+    }
+    const unseenIds = { ...byId };
+    console.log("byId:", byId);
+    for (let d of remoteData) {
+      if (d.id in byId) {
+        const item = byId[d.id];
+        if (item.textContent != d.displayName) {
+          console.log("Update player name: ", d.displayName);
+          item.textContent = d.displayName;
+        }
+      } else {
+        const item = this.addPlayer(d);
+        byId[d.id] = item;
+      }
+      delete unseenIds[d.id];
+    }
+    const selfId = this.game.player.id;
+    let selfItem = byId[selfId];
+    if (selfItem) {
+      selfItem.classList.add("self");
+    }
+    console.log("unseenIds:", unseenIds);
+    for (let [id, item] of Object.entries(unseenIds)) {
+      item.parentNode.removeChild(item);
+    }
+  }
+  addPlayer({ id, displayName }) {
+    let item = document.createElement("li");
+    item.textContent = displayName;
+    item.dataset.id = id;
+    item.className = "player";
+    this.playersList.appendChild(item);
+    return item;
   }
 }
 SceneExports.LobbyScene = LobbyScene;

@@ -7,18 +7,22 @@ class Player extends RemoteDocument {
   get score() {
     return this._remoteDocumentData?.score || 0;
   }
+  get id() {
+    return this._remoteDocumentData?.id;
+  }
   async initialize() {
-    let { collectionId, docId } = this._options;
+    let { collectionId, userId } = this._options;
     let displayName;
     if (!this.displayName) {
+      const seedStr = userId || collectionId;
       displayName = mnemonic.encode([
-        docId.charCodeAt(0),
-        docId.charCodeAt(1),
-        docId.charCodeAt(docId.length-1),
-        docId.charCodeAt(Math.floor(Math.random() * docId.length))
+        seedStr.charCodeAt(0),
+        seedStr.charCodeAt(1),
+        seedStr.charCodeAt(seedStr.length-1),
+        seedStr.charCodeAt(Math.floor(Math.random() * seedStr.length))
       ],  "x x-x").replace(/\b([a-z])/g, (m, initialLetter) => initialLetter.toUpperCase());
     }
-    await super.initialize({ displayName });
+    await super.initialize({ displayName, userId });
   }
   handleChange(label, data) {
     if (label == "self-change") {

@@ -12,10 +12,7 @@
 
   <script async src="./assets/config.js"></script>
   <script async src="./assets/mnemonic.js"></script>
-  <script type="module" src="./assets/user.js"></script>
   <script async src="./assets/elements.js"></script>
-  <script type="module" src="./assets/client.js"></script>
-  <script type="module" src="./assets/scenes.js"></script>
   <script type="module" src="./assets/main.js" defer></script>
 </head>
 
@@ -38,7 +35,7 @@
         <h2>Waiting for players</h2>
       </header>
       <section class="body">
-        <ul class="userlist" id="playersjoined"></ul>
+        <ul class="playerlist" id="playersqueued"></ul>
       </section>
       <footer>
         <button class="primary-action" onclick="game.switchScene('cardplay')">Begin!</button>

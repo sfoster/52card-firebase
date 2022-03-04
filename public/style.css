@@ -80,7 +80,6 @@ body {
   color: white;
 }
 
-
 .scene-panel > section.body {
   padding: 0.5rem 0 1rem 0.5rem;
   flex: 1 1 0;
@@ -138,15 +137,22 @@ h1 {
   margin: 0;
 }
 
-.userlist {
+.playerlist {
   list-style: none;
   padding: 0;
   margin: 0;
   border: 1px solid black;
   border-radius: 8px
 }
+.playerlist > .player {
+  opacity: 0.7;
+}
+.playerlist > .player.self {
+  opacity: 1;
+}
 
 /* The card-play scene */
+
 #cardplay.scene-panel > section.body {
   position: relative;
   overflow: unset;
@@ -226,6 +232,28 @@ h1 {
 /* The lobby scene */
 #lobby.scene-panel > section.body {
   min-height: min-content; /* needs vendor prefixes */
+}
+
+#playersqueued > .player {
+  padding: 1.5em 1em;
+  font-size: smaller;
+  min-width: 14em;
+  text-align: left;
+
+  background-color: rgba(0,0,0,0.4);
+  color: #fff;
+  margin: 1px 0;
+}
+
+#playersqueued > .player:first-of-type {
+  border-radius: 8px 8px 0 0;
+}
+#playersqueued > .player:last-of-type {
+  border-radius: 0 0 8px 8px;
+}
+
+#playersqueued > .player.self {
+  background-color: rgba(0,0,204,0.4);
 }
 
 editable-item {
