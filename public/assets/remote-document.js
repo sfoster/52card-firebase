@@ -43,7 +43,6 @@ class RemoteDocument {
   }
   update(changes = {}) {
     let { collectionId } = this._options;
-    changes.lastSeen = Date.now();
     console.log("calling updateDocument with changes", changes);
     return this._client.updateDocument(collectionId, this.id, changes);
   }

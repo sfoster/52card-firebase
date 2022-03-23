@@ -61,7 +61,8 @@ async function resetPlayers() {
 }
 
 async function createNewGame() {
-  let data = require('./new-game').data;
+  let data = require('./lib/new-game').data;
+  console.log("game data:", data);
 
   const nullPlayerSnapshot = await db.collection("players").doc("null-player").get();
   if (!nullPlayerSnapshot.exists) {
@@ -103,5 +104,5 @@ async function createNewGame() {
 // limitToLastQuery();
 
 // listPlayers();
-// resetPlayers();
-createNewGame();
+resetPlayers();
+// createNewGame();

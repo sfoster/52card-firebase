@@ -22,7 +22,10 @@ class Player extends RemoteDocument {
         seedStr.charCodeAt(Math.floor(Math.random() * seedStr.length))
       ],  "x x-x").replace(/\b([a-z])/g, (m, initialLetter) => initialLetter.toUpperCase());
     }
-    await super.initialize({ displayName, userId });
+    const lastSeen = Date.now();
+    console.log("Player#initialize: ", { displayName, userId, lastSeen });
+    await super.initialize({ displayName, userId, lastSeen });
+    await this.touch();
   }
   handleChange(label, data) {
     if (label == "self-change") {
@@ -36,6 +39,9 @@ class Player extends RemoteDocument {
         console.log("Remote change not handled: ", label, data);
         break;
     }
+  }
+  async touch() {
+    return this.update({ lastSeen: Date.now() });
   }
 }
 export default Player;

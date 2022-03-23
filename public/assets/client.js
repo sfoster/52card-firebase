@@ -113,15 +113,15 @@ class FirebaseClient {
       unsubscriber = onSnapshot(changeQuery, {
         next: (result) => {
           if (queryParams.type == "query" || queryParams.type == "collection") {
-            let results = [];
+            let items = [];
             result.forEach(doc => {
               const id = doc._key.path.segments[doc._key.path.segments.length -1];
-              results.push({
+              items.push({
                 id,
                 ...doc.data(),
               });
             });
-            this.onRemoteChange(topicKey, results);
+            this.onRemoteChange(topicKey, items);
           } else {
             // result is a DocumentReference
             const source = result.metadata.hasPendingWrites ? "Local" : "Server";
@@ -183,8 +183,10 @@ class FirebaseClient {
   }
   async updateDocument(collectionId, docId, updateProps) {
     console.log("updateDocument:", collectionId, docId, updateProps);
-    await setDoc(doc(this.remoteStore, collectionId, docId), updateProps);
+    const docRef = doc(this.remoteStore, collectionId, docId);
+    await setDoc(docRef, updateProps, { merge: true });
   }
+
   async getOrCreateDocument(collectionId, docId, initialData) {
     let docSnapshot;
     if (docId) {
@@ -205,7 +207,7 @@ class FirebaseClient {
         const docRef = await addDoc(collection(this.remoteStore, collectionId), initialData);
         docSnapshot = await getDoc(docRef);
       } catch (ex) {
-        console.warn("getOrCreateDocument: failed create and then fetch doc at", collectionId, ex);
+        console.warn("getOrCreateDocument: failed to create and then fetch doc at", collectionId, ex);
         return null;
       }
     }
@@ -224,52 +226,11 @@ class FirebaseClient {
       ...snapshot.data()
     };
   }
-  status() {
-    if (
-      this.firebaseApp &&
-      this.authService &&
-      this.remoteStore &&
-      !this.error
-    ) {
-      return this.initialize().then(() => {
-        return { ok: true };
-      });
-    } else {
-      Promise.reject(this.error);
-    }
-  }
   async signIn() {
     await this.initialize();
     let userCredential = await signInAnonymously(this.authService);
     return userCredential?.user;
   }
-  fetchUsers(createFakes) {
-    // generate data locally for now
-    // add some fake users so we can see what it might look like
-    const users = [];
-    if (createFakes) {
-      for (let i=0; i<8; i++) {
-        users.push({
-          uid: (Math.random() * 1000).toFixed(1),
-          displayName: mnemonic.encode([
-            Math.floor(Math.random() * 256),
-            Math.floor(Math.random() * 256),
-            Math.floor(Math.random() * 256),
-            Math.floor(Math.random() * 256),
-          ],  "x x-x").replace(/\b([a-z])/g, (m, initialLetter) => initialLetter.toUpperCase()),
-          score: Math.floor(Math.random() * 26),
-        });
-      }
-    }
-
-    return new Promise((res, rej) => {
-      setTimeout(() => res({
-        added: users,
-        status: users
-      }), 60);
-    });
-  }
-
 }
 
 class FakeClient {

@@ -14,6 +14,7 @@ class Scene {
     delete options.player;
     this.options = options;
     this._topics = new Set();
+    this._onExitTasks = [];
     this._active = false;
   }
   listen(name) {
@@ -29,6 +30,7 @@ class Scene {
   }
   enter(params = {}) {
     this._active = true;
+    this._onExitTasks.length = 0;
     if (params.client) {
       this.client = params.client;
     }
@@ -46,6 +48,13 @@ class Scene {
       this.removeListener(topic);
     }
     this.elem.classList.add("hidden");
+
+    if (this._onExitTasks.length) {
+      let task;
+      while ((task = this._onExitTasks.shift())) {
+        task();
+      }
+    }
   }
   handleEvent(event) {
     let mname = 'on'+event.type[0].toUpperCase()+event.type.substring(1);
@@ -84,6 +93,8 @@ class InitializeScene extends Scene {
     );
   }
   async statusOk(statusData) {
+    console.log("statusOk:", statusData);
+    console.log("this.game.player:", this.game.player);
     if (!this.game.player) {
       const player = this.game.player = new Player(this.game.client, {
         collectionId: "players",
@@ -105,49 +116,7 @@ class InitializeScene extends Scene {
 }
 SceneExports.InitializeScene = InitializeScene;
 
-class LobbyScene extends Scene {
-  enter(params = {}) {
-    super.enter(params);
-    this._onExitTasks = [];
-    console.log("LobbyScene, got params", params);
-    console.log("Player", this.game.player);
-
-    this.playersList = this.elem.querySelector("#playersqueued");
-
-    // let somePlayersQuery = gClient.buildQuery({
-    //   collectionId: "players",
-    //   whereTerms: ["uid", "!=", this.game.player.id] });
-    let allPlayersQuery = this.client.buildQuery({
-      collectionId: "players",
-      whereTerms: ["userId", "!=", false]
-    });
-    this.client.addChangeListener(allPlayersQuery, this, "all-players");
-
-    this._onExitTasks.push(() => {
-      console.log("exit task: unhook the allPlayersQuery listener");
-      this.client.removeChangeListener(allPlayersQuery, this, "all-players");
-    });
-  }
-  handleChange(label, data) {
-    switch (label) {
-      case "self-change":
-        console.log("The player document got an update:", data);
-        document.querySelector("#player-name").textContent = data.
-        break;
-      case "all-players":
-        console.log("The all-players query got an update:", data);
-        this.updatePlayersList(data);
-        break;
-      default:
-        console.info("changeListener got some change: ", label, data);
-    }
-  }
-  exit() {
-    let task;
-    while ((task = this._onExitTasks.shift())) {
-      task();
-    }
-  }
+class _SceneWithPlayers extends Scene {
   updatePlayersList(remoteData) {
     console.log("updatePlayersList with remoteData:", remoteData);
     const byId = {};
@@ -155,7 +124,6 @@ class LobbyScene extends Scene {
       byId[item.dataset.id] = item;
     }
     const unseenIds = { ...byId };
-    console.log("byId:", byId);
     for (let d of remoteData) {
       if (d.id in byId) {
         const item = byId[d.id];
@@ -188,29 +156,122 @@ class LobbyScene extends Scene {
     return item;
   }
 }
+
+class LobbyScene extends _SceneWithPlayers {
+  get allPlayersQuery() {
+    return this.client.buildQuery({
+      collectionId: "players",
+      whereTerms: ["userId", "!=", "ghost"]
+    });
+  }
+  enter(params = {}) {
+    super.enter(params);
+
+    this.game.id = "VRd8nImu8Vjz1J28DNhq";
+
+    console.log("LobbyScene, got params", params);
+    console.log("Player", this.game.player);
+
+    this.playersList = this.elem.querySelector("#playersqueued");
+
+    const allPlayersQuery = this.allPlayersQuery;
+    this.client.addChangeListener(allPlayersQuery, this, "all-players");
+
+    this._onExitTasks.push(() => {
+      console.log("exit task: unhook the allPlayersQuery listener");
+      this.client.removeChangeListener(allPlayersQuery, this, "all-players");
+    });
+  }
+  handleChange(label, data) {
+    switch (label) {
+      case "self-change":
+        console.log("The player document got an update:", data);
+        document.querySelector("#player-name").textContent = data.
+        break;
+      case "all-players":
+        console.log("The all-players query got an update:", data);
+        this.updatePlayersList(data);
+        break;
+      default:
+        console.info("changeListener got some change: ", label, data);
+    }
+  }
+}
 SceneExports.LobbyScene = LobbyScene;
 
-class CardPlayScene extends Scene {
+
+class CardPlayScene extends _SceneWithPlayers {
+  get gamePlayersQuery() {
+    return this.client.buildQuery({
+      collectionId: `games/${this.game.id}/players`,
+      whereTerms: ["userId", "!=", "ghost"]
+    });
+  }
   async enter(params = {}) {
     super.enter(params);
-    this.elem.addEventListener("game-action", this);
+
+    this._gotFirstCards = false;
+
     this.cardTableElem = this.elem.querySelector("#table");
-    const cardItemsPromise = this.client.fetchCardsData();
-    const usersPromise = this.client.fetchUserData();
-    this.cardTableElem.begin({ added: await cardItemsPromise });
+    this.playersList = this.elem.querySelector("#playerStatus");
 
-    this.userList = this.elem.querySelector("#userStatus");
-    const { status } = await usersPromise;
-    console.log("CardPlayScene#enter, users:", status);
+    this.elem.addEventListener("game-action", this);
 
-    let frag = document.createDocumentFragment();
-    for (let user of await status) {
-      let item = document.createElement("li");
-      item.textContent = `${user.name} (${user.score})`;
-      frag.appendChild(item);
-    }
-    this.userList.appendChild(frag);
+    console.log("CardPlayScene enter, preparing queries. game id: ", this.game.id);
+
+    // we'll monitor the players list so we can know which cards are claimed
+    // and each player score
+    const gamePlayersQuery = this.gamePlayersQuery;
+    console.log("CardPlayScene enter, addChangeListener for all-players");
+    this.client.addChangeListener(gamePlayersQuery, this, "all-players");
+
+    // monitor the cards list
+    let allCardsQuery = this.client.buildQuery({
+      collectionId: `/games/${this.game.id}/cards`
+    });
+
+    console.log("CardPlayScene enter, addChangeListener for all-cards");
+    this.client.addChangeListener(allCardsQuery, this, "all-cards");
+
+    this._onExitTasks.push(() => {
+      console.log("exit task: unhook the gamePlayersQuery listener");
+      this.client.removeChangeListener(gamePlayersQuery, this, "all-players");
+      this.client.removeChangeListener(allCardsQuery, this, "all-cards");
+    });
   }
+
+  onInitialCardsList(remoteData) {
+    console.log("CardPlayScene enter, onInitialCardsList", remoteData);
+    this._gotFirstCards = true;
+
+    // we start out using the whole collection of cards
+    // value: 1 2 3 4 5 6 7 8 9 10 J Q K
+    // suit: ♥ ♦ ♣ ♠
+    this.cardTableElem.begin({ added: remoteData });
+  }
+
+  handleChange(label, data) {
+    switch (label) {
+      case "self-change":
+        console.log("The player document got an update:", data);
+        break;
+      case "all-players":
+        this.updatePlayersList(data);
+        break;
+      case "all-cards":
+        console.log("The all-cards query got an update:", data);
+        if (!this._gotFirstCards) {
+          this.onInitialCardsList(data);
+        } else {
+          console.log("all-cards query update");
+        }
+        // this.updatePlayersList(data);
+        break;
+      default:
+        console.info("changeListener got some change: ", label, data);
+    }
+  }
+
   handleEvent(event) {
     const eventData = event.detail;
     if (event.type == "click" && event.target.localName == "game-card") {

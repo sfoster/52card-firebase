@@ -19,11 +19,9 @@ class Game {
       this.previousScene = null;
     }
     if (this.currentScene) {
-      if (this.currentScene.id.startsWith("waiting")) {
-        this.previousScene = this.currentScene;
-      }
-      this.currentScene.elem.classList.remove("current");
-      this.currentScene.exit();
+      this.previousScene = this.currentScene;
+      this.previousScene.elem.classList.remove("current");
+      this.previousScene.exit();
     }
     if (this.previousScene) {
       this.previousScene.elem.classList.add("previous");
